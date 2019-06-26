@@ -2,10 +2,34 @@
 
 %% Read logs
 currentlocation = cd;
-% cd '\\NEUROTOUCH2\Trainee\MyNeuroTouchData\Test_Sharing';
-% filename = dir('*_log.csv');
-% [~,request] = max([filename(:).datenum]);   %Newest file has max value at 'datenum'
-% HL = readtable(filename(request).name,'delimiter',',');
+
+cd('\\NEUROTOUCH2\Trainee\MyNeuroTouchData\Test_Sharing');
+filename = dir('*_log.csv');
+[~,request] = max([filename(:).datenum]); 
+core = readtable(filename(request).name,'delimiter',',');
+%core = readtable('SubPialResection101-KFMC_scenario.xml_2015-Jul-13_10h10m42s_log.csv','delimiter',',');
+
+TipDistance = [core.TranslationRight_x-core.TranslationLeft_x core.TranslationRight_y-core.TranslationLeft_y core.TranslationRight_z-core.TranslationLeft_z];
+TipDistance3D = sqrt(TipDistance(:,1).^2 + TipDistance(:,2).^2 + TipDistance(:,3).^2);
+
+if contains(core.InstrumentRightHand(1), 'CUSA')
+    Translation = [core.TranslationRight_x core.TranslationRight_y core.TranslationRight_z core.TranslationLeft_x core.TranslationLeft_y core.TranslationLeft_z];
+    forcecusa = core.ForceFeedbackRightHand;
+    forcebipolar = core.ForceFeedbackLeftHand;
+else
+    Translation = [core.TranslationLeft_x core.TranslationLeft_y core.TranslationLeft_z core.TranslationRight_x core.TranslationRight_y core.TranslationRight_z];
+    forcebipolar = core.ForceFeedbackRightHand;
+    forcecusa = core.ForceFeedbackLeftHand;
+end
+
+Velocity = diff(Translation);
+Velocity3D = [sqrt(Velocity(:,1).^2 + Velocity(:,2).^2 + Velocity(:,3).^2) sqrt(Velocity(:,4).^2 + Velocity(:,5).^2 + Velocity(:,6).^2)];
+Acceleration3D = abs(diff(Velocity3D));
+
+meanTipDistance3D = mean(TipDistance3D);
+maxForceBipolarHand = max(forcebipolar);
+meanTotalBloodEmittedDr = mean(diff(core.BloodEmittedFrame));
+meanAcceleration3DBipolar = mean(Acceleration3D(:,2));
 
 %% Load sounds
 % cd 'D:\MCGILL PRO\Desktop\Nykan Code\AI_Feedback\Instructions';
@@ -13,35 +37,15 @@ currentlocation = cd;
 % for i=3
 %     [soundp,fs] = audioread(soundName(i).name);
 % end
-%% Data Corrections
-HL = readtable('D:\MCGILL PRO\Desktop\AI for laminectomy trial\Fellows\ACDF71\HemiLaminectomy.xml_2019-Jan-15_16h10m14s_log.csv','delimiter',',');
-HL(1,:)=[];
-y= table2struct(HL,'ToScalar',true);
-
-    fields = fieldnames(y);
-% y=Experts_data(1);
-% if person is left handed
-if find(contains(y.InstrumentRightHand(1),'SuctionCurved7Fr'))==1
-    for i=2:30
-        x.(fields{1}) = y.(fields{1});
-        x.(fields{i}) = y.(fields{i+29});
-        x.(fields{i+29}) = y.(fields{i});
-        for o=59:76
-            x.(fields{o}) = y.(fields{o});
-        end
-    end
-else
-    x=y;
-end
 
 
 cd(currentlocation)
 
 %% Metric Generation
-Metric1=0.83;
-Metric2=0.000016;
-Metric3=12;
-Metric4=0.024;
+Metric1=maxForceBipolarHand;
+Metric2=meanTotalBloodEmittedDr;
+Metric3=meanTipDistance3D;
+Metric4=meanAcceleration3DBipolar;
 
 Metrics = [Metric1 Metric2 Metric3 Metric4];
 
